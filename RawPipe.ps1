@@ -1,4 +1,8 @@
-﻿## Get the standard output of a process so we can 'pipe' it
+﻿## Copyright 2012 Robert Nees
+## Licensed under the Apache License, Version 2.0 (the "License");
+## http://sushihangover.blogspot.com
+## 
+## Get the standard output of a process so we can 'pipe' it
 ## to another process and avoid PowerShell's object pipe which is not 
 ## what you want when you do things like this in CMD.exe or a Linux shell:
 ##

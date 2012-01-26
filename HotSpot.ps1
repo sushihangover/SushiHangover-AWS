@@ -1,4 +1,4 @@
-﻿## Copyright [yyyy] [name of copyright owner]
+﻿## Copyright 2012 Robert Nees
 ## Licensed under the Apache License, Version 2.0 (the "License");
 ## http://sushihangover.blogspot.com
 ##
