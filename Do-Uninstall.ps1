@@ -19,7 +19,6 @@ if ($app -ne $null) {
     switch ($result)
     {
         1 {
-            "You selected Yes."
             #$app.Uninstall()
         }
         0 {
