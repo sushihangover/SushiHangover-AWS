@@ -49,7 +49,7 @@ Add-Type -AssemblyName system.core # Needed for named pipes
         write-host "Created $procName2 process"
 
         $foo = 0
-        $buffer = new-object char[] 4096
+        $buffer = new-object char[] 32768
         try {
             do {
                 $readCount = $process1.StandardOutput.ReadBLock($buffer, 0, $buffer.Length)
