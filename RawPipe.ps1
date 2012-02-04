@@ -10,7 +10,7 @@
 ##
 ## Becomes in PowerShell:
 ##
-## BinaryPipe.ps1 makepretty.exe "-if myface.jpg -of -" findmate.exe "-if - -of listofladys.csv"
+## RawPipe.ps1 makepretty.exe "-if myface.jpg -of -" findmate.exe "-if - -of listofladys.csv"
 ##
 param([string] $procName1, [string] $argList1, [string] $procName2, [string] $argList2, [string] $working1Path, [string] $working2Path) 
 
