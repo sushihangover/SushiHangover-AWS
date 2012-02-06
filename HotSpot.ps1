@@ -17,6 +17,7 @@ if (($run -eq 'stop') -and ($args.length -eq 1 )) {
     }
 } elseif (($run -ne 'stop') -and ($args.length -eq 1 ))  {
     services.ps1 $run "Connectify"
+    Start-Sleep 5
     & 'C:\Program Files\Connectify\ConnectifyCLI.exe' hotspot $args[0]
     & 'C:\Program Files\Connectify\ConnectifyCLI.exe' config get
 } elseif ($args.length -gt 1 ) {
