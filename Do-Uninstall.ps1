@@ -10,7 +10,6 @@ if ($app.count -gt 1) {
 }
 if ($app -ne $null) {
     $app.Name
-    $title = "Uninstall Program"
     $message = "Do you want to uninstall this program?"
     $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Uninstall the program."
     $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", "Exit script; do not uninstall the program."
@@ -19,7 +18,7 @@ if ($app -ne $null) {
     switch ($result)
     {
         1 {
-            #$app.Uninstall()
+            $app.Uninstall()
         }
         0 {
             exit
