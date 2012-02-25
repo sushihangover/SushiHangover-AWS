@@ -31,6 +31,6 @@ Param (
 )
 write-host "Sleeping for" ($minutes) "minutes before shutdown (Ctrl-C to break)"
 start-sleep ($minutes * 60)
-shutdown /($type)
+shutdown /$type
 Read-Host "Press ENTER to abort"
 shutdown /a
