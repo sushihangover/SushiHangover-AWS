@@ -30,7 +30,8 @@ try {
                 ($key.key -eq "C"))
             {
                 write-host "Terminating..."
-                $jobWatch | stop-job
+                $jobWatch | stop-job 
+                remove-job $jobWatch
                 break
             }
         }
