@@ -42,6 +42,13 @@ if ($driveLetter -eq '') {
     exit
 } else {
     $cd_drive = $driveLetter
-    $sa = New-Object -comObject Shell.Application
-    $sa.Namespace(17).ParseName("$cd_drive").InvokeVerb("Eject") 
+    if ($remoteServer = 'localhost') {
+        $sa = New-Object -comObject Shell.Application
+        $sa.Namespace(17).ParseName("$cd_drive").InvokeVerb("Eject")
+    } else {
+        Invoke-Command -ComputerName $remoteServer -ScriptBlock {
+            $sa = New-Object -comObject Shell.Application
+            $sa.Namespace(17).ParseName("$cd_drive").InvokeVerb("Eject")
+        }
+    }
 }
