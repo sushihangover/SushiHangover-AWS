@@ -36,7 +36,7 @@ Process {
         if ($killMe -is [System.Diagnostics.Process]) {
             $killList += $killMe
             if (!$whatif.IsPresent) {
-                # $killMe.Kill()
+                $killMe.Kill()
             }
         }
     } catch {
