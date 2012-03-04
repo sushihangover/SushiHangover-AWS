@@ -38,6 +38,8 @@ Process {
             if (!$whatif.IsPresent) {
                 $killMe.Kill()
             }
+        } else {
+            $killMe | % { if (!$whatif.IsPresent) { $_.Kill()} ; $killList += $_ }
         }
     } catch {
         write-host "No process named $processName found" -ForegroundColor Red -BackgroundColor White
