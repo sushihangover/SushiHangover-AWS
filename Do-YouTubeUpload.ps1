@@ -69,7 +69,7 @@ Begin {
 
             # test category to insure that it is valid 
 
-            $settings = new-object Google.YouTube.YouTubeRequestSettings("SushiHangover.blogspot.com", $google.key, $google.id, $googlepwd);
+            $settings = new-object Google.YouTube.YouTubeRequestSettings("SushiHangover.blogspot.com", $google.key, $google.id, $google.pwd);
             $settings.Timeout = 1000000
 
             $request = New-Object Google.YouTube.YouTubeRequest($settings);
