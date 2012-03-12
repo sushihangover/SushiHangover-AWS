@@ -6,17 +6,18 @@ http://sushihangover.blogspot.com
 .SYNOPSIS
 Upload video(s) to YouTube
 .DESCRIPTION
-This scripts provides a way upload one or more videos to YouTube using 
+This scripts provides a way to upload one or more videos to YouTube using 
 the Powershell pipeline or standard named input parameters. Rejection and 
 Upload Errors are logged to the Event Log for remote reporting.
 
-I originally wrote this in python to be used with direct Amazon/AWS S3 bucket uploading and 
-a REST event being published via Amazon Simple Notification Service (SNS) to know when to 
-upload and archive new videos to YouTube, but also wanted a PowerShell based version for my Window deployments.
+I originally wrote this in python to be used with an automation project that used direct Amazon/AWS S3 bucket 
+uploading and a REST event being published via Amazon Simple Notification Service (SNS) to know when to 
+upload and archive new videos to YouTube, but also wanted a PowerShell based version for my Window deployments
+but there was no PowerShell version available.
  
 The pipeline output object is a Gdata/Youtube video object, if you used the -noWait switch parameter
 than there is no guarantee that this object is for the final video as its 'State' could still be
-'IsDraft', otherwise this script is synchronize and the video output object will be 'IsDraft' = false and
+'IsDraft', otherwise this script is synchronize and the video output object will be 'IsDraft = false' and
 'might' have passed, failed or got rejected, check the 'Status' property to determine the final status 
 of the video uploaded
 
