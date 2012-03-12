@@ -142,7 +142,4 @@ End {
     $youtubeService = $null
     $request = $null
     $settings = $null
-    $googleDevKey = ''
-    $googleUser = ''
-    $googlePassword = ''
 }
