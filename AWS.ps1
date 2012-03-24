@@ -99,7 +99,7 @@ Function Get-AWSCredentials {
     if (!(Test-Path ($Location + '\' + $Filename))) {
         write-host 'AWS Account Information file missing, run Set-AWSCredentials' -ForegroundColor Red
         help Set-AWSCred -examples
-        exit
+        break
     }
     return Import-Clixml -Path ($Location + '\' + $Filename)
 }
@@ -178,21 +178,21 @@ Function Get-AWSS3Client {
     new-variable -scope global -name AWSS3Client -force -value ([Amazon.AWSClientFactory]::CreateAmazonS3Client($AWSBasicCredentials.GetCredentials().AccessKey, $AWSBasicCredentials.GetCredentials().ClearSecretKey, $AWSS3Config))
     return $AWSS3Client
 }
-Function Read-Buckets {
+Function Read-S3Buckets {
     Param(
         [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
     )
     new-variable -scope global -name AWSS3Buckets -force -value ($AWSS3Client.ListBuckets())
-    return $AWSS3Buckets
+    return $AWSS3Buckets.Buckets
 }
-Function New-Bucket {
+Function New-S3Bucket {
     Param(
-        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client),
         [Parameter(Mandatory=$true)][Alias('name')][string]$S3BucketName,
-        [Parameter(Mandatory=$false)][Alias('region')][string]$S3RegionName
+        [Parameter(Mandatory=$false)][Alias('region')][string]$S3RegionName,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
     )
     $s3BucketRequest = New-Object Amazon.S3.Model.PutBucketRequest
-    if (!$S3Region) {
+    if ($S3RegionName) {
         $s3BucketRequest.BucketRegion = [Amazon.S3.Model.S3Region]::($S3RegionName)
     } else {
         $s3BucketRequest.BucketRegion = (. Get-S3Region)
@@ -214,8 +214,8 @@ Function New-Bucket {
 }
 Function Remove-s3Bucket {
     Param(
-        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client),
-        [Parameter(Mandatory=$true)][Alias('name')][string]$S3BucketName
+        [Parameter(Mandatory=$true)][Alias('name')][string]$S3BucketName,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
     )
     $s3BucketRequest = New-Object Amazon.S3.Model.DeleteBucketRequest 
     $s3BucketRequest.BucketName = $S3BucketName
@@ -251,6 +251,13 @@ Function Get-S3Region {
     }
     return $AWSS3Region
 }
+Function Exist-S3Bucket {
+    Param(
+        [Parameter(Mandatory=$true)][Alias('name')][string]$S3BucketName,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
+    )
+    return (Read-S3Buckets | % { $_.BucketName } ).Contains($S3BucketName)
+}
 Function Get-S3Bucket {
     Param(
         [Parameter(Mandatory=$true)][Alias('name')][string]$S3BucketName,
@@ -261,6 +268,10 @@ Function Get-S3Bucket {
         [Parameter(Mandatory=$false)][Alias('r')][Amazon.S3.Model.ListObjectsRequest]$Request
     )
     Begin {
+        if (!(Exist-S3Bucket $S3BucketName)) {
+            write-host 'Bucket' $S3BucketName 'does NOT exist' -ForegroundColor Red
+            break
+        }
         $c = 0
         if (!$Request) {
             $listRequest = New-Object Amazon.S3.Model.ListObjectsRequest
@@ -280,10 +291,12 @@ Function Get-S3Bucket {
             } else {
                 $listRequest = $null
             }
-            $response.S3Objects | ForEach-Object {
-                [Amazon.S3.Model.S3Object]$_
-                $c++
-                if ($c -gt $Count) { break }
+            if ($response.S3Objects.Count -gt 0) {
+                $response.S3Objects | ForEach-Object {
+                    [Amazon.S3.Model.S3Object]$_
+                    $c++
+                    if ($c -gt $Count) { break }
+                }
             }
         } while ($listRequest)
     }
@@ -291,18 +304,127 @@ Function Get-S3Bucket {
         # return $response
     }
 }
+Function Copy-S3Object {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('r')][Amazon.S3.Model.CopyObjectRequest]$CopyRequest,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
+    )
+    return [Amazon.S3.Model.CopyObjectResponse]$AWSS3Client.CopyObject($CopyRequest)
+}
+Function Remove-S3Object {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('r')][Amazon.S3.Model.DeleteObjectRequest]$DeleteRequest,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
+    )
+    return [Amazon.S3.Model.DeleteObjectResponse]$AWSS3Client.DeleteObject($DeleteRequest)
+}
+Function Remove-S3Objects {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('r')][Amazon.S3.Model.DeleteObjectsRequest]$DeleteRequest,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
+    )
+    return [Amazon.S3.Model.DeleteObjectsResponse]$AWSS3Client.DeleteObjects($DeleteRequest)
+}
+Function Create-S3DeleteRequest {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('o')][Amazon.S3.Model.S3Object]$DeleteObject,
+        [Parameter(Mandatory=$false)][Alias('r')][Amazon.S3.Model.DeleteObjectsRequest]$DeleteRequest,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
+    )
+    if ($DeleteRequest) {
+        $DeleteRequest.AddKey($DeleteObject.Key)
+    } else {
+        $DeleteRequest = New-Object Amazon.S3.Model.DeleteObjectRequest
+        $request.BucketName = $S3BucketName
+        $request.Key = $Key
+    }
+    return $DeleteRequest
+}
+Function Remove-S3Key {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('b')][string]$S3BucketName,
+        [Parameter(Mandatory=$true)][Alias('k')][string]$Key,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
+    )
+    $request = New-Object Amazon.S3.Model.DeleteObjectRequest
+    $request.BucketName = $S3BucketName
+    $request.Key = $Key
+    return Remove-S3Object($request)
+}
+Function Clear-S3Bucket {
+    Param(
+        [Parameter(Mandatory=$true)][Alias('b')][string]$S3BucketName,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client),
+        [Parameter(Mandatory=$false)][switch]$WhatIf
+    )
+    if (!(Exist-S3Bucket $S3BucketName)) {
+        Write-host 'Bucket (' $S3BucketName ') does NOT exist' -ForegroundColor Red
+        break
+    }
+    $request = New-Object Amazon.S3.Model.DeleteObjectsRequest
+    Get-S3Bucket $S3BucketName | Foreach-Object {
+        $request = Create-S3DeleteRequest -o $_ -r $request -s3client $AWSS3Client
+    }
+    $request.BucketName = $S3BucketName # ensure that nothing in delete request changed the bucket(?)
+    if ($request.Keys.Count -gt 0) {
+        if ($WhatIf.IsPresent) {
+            $request.Keys | ForEach-Object { $_ } | ft -auto
+        } else {
+            Remove-S3Objects -r $request -s3client $AWSS3Client
+        }
+    }
+}
+Function Copy-S3Bucket {
+    Param(
+        [Parameter(Mandatory=$true)][Alias('from')][string]$FromS3BucketName,
+        [Parameter(Mandatory=$true)][Alias('to')][string]$ToS3BucketName,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
+    )
+    if ((!(Exist-S3Bucket $FromS3BucketName)) -or (!(Exist-S3Bucket $ToS3BucketName)))  {
+        Write-host 'Bucket does NOT exist' -ForegroundColor Red
+        break
+    }
+    $S3CopyResponse = @()
+    Get-S3Bucket $FromS3BucketName | % {
+        $request = New-object Amazon.S3.Model.CopyObjectRequest
+        $request.SourceBucket = $_.BucketName
+        $request.SourceKey = $_.Key
+        $request.DestinationBucket = $ToS3BucketName
+        $request.DestinationKey = $_.Key
+        $S3CopyResponse += Copy-S3Object $request
+    }
+    return $S3CopyResponse
+}
 Function Rename-Bucket {
     Param(
-        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client),
-        [Parameter(Mandatory=$true)][Alias('Path')][string]$OldS3BucketNameOld,
-        [Parameter(Mandatory=$true)][Alias('NewName')][string]$NewS3BucketName
-        )
+        [Parameter(Mandatory=$true)][Alias('Path')][string]$OriginalS3BucketName,
+        [Parameter(Mandatory=$true)][Alias('NewName')][string]$NewS3BucketName,
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
+    )
     try {
-        $foo = New-Bucket $NewS3BucketName -region $NewS3BucketRegion
+        if (!(Exist-S3Bucket $OriginalS3BucketName)) {
+            Write-host 'Origina bucket name' $OriginalS3BucketName 'does NOT exist' -ForegroundColor Red
+            break
+        }
+        if (Exist-S3Bucket $NewS3BucketName) {
+            Write-host 'New bucket name' $NewS3BucketName 'already exists' -ForegroundColor Red
+            break
+        }
+        $newBucketResponse = New-Bucket -name $NewS3BucketName
+        Get-S3Bucket $OriginalS3BucketName | % {
+            $request = New-object Amazon.S3.Model.CopyObjectRequest
+            $request.SourceBucket = $_.BucketName
+            $request.SourceKey = $_.Key
+            $request.DestinationBucket = $NewS3BucketName
+            $request.DestinationKey = $_.Key
+            Copy-S3Object $request
+        }
+        $deletebucket = Remove-Bucket -name $OriginalS3BucketName
     } catch [Amazon.S3.AmazonS3Exception] {
-        [Amazon.S3.AmazonS3Exception]$error.Message
+        [Amazon.S3.AmazonS3Exception]$error[0].Message
         break
     } catch {
+        $error[0]
     }
 
 #catch (AmazonS3Exception amazonS3Exception)
