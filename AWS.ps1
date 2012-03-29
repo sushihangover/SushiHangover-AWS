@@ -71,24 +71,24 @@ Function duplicateMembers {
 Function Get-Enum([type]$type){
     [enum]::getNames($type) | select @{n="Name";e={$_}},@{n="Value";e={$type::$_.value__}}
 }
-Function Add-AWS {
+Function Add-AWSSDK {
     Add-Type -path "C:\Program Files\AWS SDK for .NET\bin\AWSSDK.dll"
     return $true # need to pass add type failures to caller
 }
 Function Set-AWSCredentials {
     Param(
-        [Parameter(Mandatory=$true)][Alias('access')][string]$Access,
-        [Parameter(Mandatory=$true)][Alias('secert')][string]$Secert,
-        [Parameter(Mandatory=$false)][Alias('id')][string]$Id = '',
-        [Parameter(Mandatory=$false)][Alias('name')][string]$Name = '',
+        [Parameter(Mandatory=$true)][Alias('akey')][string]$AccessKey,
+        [Parameter(Mandatory=$true)][Alias('skey')][string]$SecretKey,
+        [Parameter(Mandatory=$false)][Alias('id')][string]$AWSId = '',
+        [Parameter(Mandatory=$false)][Alias('name')][string]$UserName = '',
         [Parameter(Mandatory=$false)][Alias('path')][string]$Location = ($HOME),
         [Parameter(Mandatory=$false)][Alias('file')][string]$Filename = 'amazon_account_info.xml'
         )
     $awsAccount = New-Object PSOBject
-    $awsAccount | add-member -membertype noteproperty -name id -value $ID
-    $awsAccount | add-member -membertype noteproperty -name name -value $NAME
-    $awsAccount | add-member -membertype noteproperty -name access -value $ACCESS
-    $awsAccount | add-member -membertype noteproperty -name secert -value $SECERT
+    $awsAccount | add-member -membertype noteproperty -name id -value $AWSId
+    $awsAccount | add-member -membertype noteproperty -name name -value $UserName
+    $awsAccount | add-member -membertype noteproperty -name access -value $AccessKey
+    $awsAccount | add-member -membertype noteproperty -name secret -value $SecretKey
     $awsAccount | export-clixml -Path ($Location + '\' + $Filename)
 }
 Function Get-AWSCredentials {
@@ -147,7 +147,7 @@ Function Get-AWSS3Config {
     }
     return $AWSS3Config
 }
-Function Set-AWSS3TransferConfig {
+Function Set-S3TransferConfig {
     Param(
         [Parameter(Mandatory=$false)][Alias('size')][int]$multiPartAt = $AWSS3MultiPartStartSize,
         [Parameter(Mandatory=$false)][int]$threads,
@@ -162,7 +162,7 @@ Function Set-AWSS3TransferConfig {
 }
 Function Get-AWSS3TransferConfig {
     if (!$AWSS3TransferConfig) {
-        . Set-AWSS3TransferConfig
+        . Set-S3TransferConfig
     }
     return $AWSS3TransferConfig
 }
@@ -171,10 +171,11 @@ Function Get-AWSS3Client {
         [Parameter(Mandatory=$false)][Alias('creds')][Amazon.Runtime.BasicAWSCredentials]$AWSBasicCredentials = (. Get-AWSBasicCredentials),
         [Parameter(Mandatory=$false)][Alias('config')][Amazon.S3.AmazonS3Config]$AWSS3Config = (. Get-AWSS3Config)
     )
-    if ($AWSS3TransferConfig) {
-        $AWSS3TransferConfig.Dispose()
-        $AWSS3TransferConfig = $null
-    }
+    # If a s3 client request comes in and an existing global transfer config exists, clean it up....
+#    if ($AWSS3TransferConfig) {
+#        $AWSS3TransferConfig.Dispose()
+#        $AWSS3TransferConfig = $null
+#    }
     new-variable -scope global -name AWSS3Client -force -value ([Amazon.AWSClientFactory]::CreateAmazonS3Client($AWSBasicCredentials.GetCredentials().AccessKey, $AWSBasicCredentials.GetCredentials().ClearSecretKey, $AWSS3Config))
     return $AWSS3Client
 }
@@ -184,6 +185,12 @@ Function Read-S3Buckets {
     )
     new-variable -scope global -name AWSS3Buckets -force -value ($AWSS3Client.ListBuckets())
     return $AWSS3Buckets.Buckets
+}
+Function Show-S3Buckets {
+    Param(
+        [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
+    )
+    return Read-S3Buckets $AWSS3Client
 }
 Function New-S3Bucket {
     Param(
@@ -212,7 +219,7 @@ Function New-S3Bucket {
 #Metadata       : {}
 #ResponseXml    :
 }
-Function Remove-s3Bucket {
+Function Remove-S3Bucket {
     Param(
         [Parameter(Mandatory=$true)][Alias('name')][string]$S3BucketName,
         [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client)
@@ -259,8 +266,9 @@ Function Exist-S3Bucket {
     return (Read-S3Buckets | % { $_.BucketName } ).Contains($S3BucketName)
 }
 Function Get-S3Bucket {
+    [CmdletBinding()]
     Param(
-        [Parameter(Mandatory=$true)][Alias('name')][string]$S3BucketName,
+        [Parameter(Mandatory=$true,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)][Alias('BucketName')][Alias('Name')][string]$PSPath,
         [Parameter(Mandatory=$false)][Alias('s3client')][Amazon.S3.AmazonS3Client]$AWSS3Client = (. Get-AWSS3Client),
         [Parameter(Mandatory=$false)][Alias('max')][string]$MaximunKeys = 25,
         [Parameter(Mandatory=$false)][Alias('p')][string]$KeyPrefix,
@@ -268,39 +276,39 @@ Function Get-S3Bucket {
         [Parameter(Mandatory=$false)][Alias('r')][Amazon.S3.Model.ListObjectsRequest]$Request
     )
     Begin {
-        if (!(Exist-S3Bucket $S3BucketName)) {
-            write-host 'Bucket' $S3BucketName 'does NOT exist' -ForegroundColor Red
+    }
+    Process {
+        if (!(Exist-S3Bucket $PSPath)) {
+            write-host 'Bucket' $PSPath 'does NOT exist' -ForegroundColor Red
             break
         }
         $c = 0
         if (!$Request) {
-            $listRequest = New-Object Amazon.S3.Model.ListObjectsRequest
-            $listRequest.BucketName = $S3BucketName
-            $listRequest.MaxKeys = $MaximunKeys
-            $listRequest.Prefix = $Prefix
-        } else {
-            $listRequest = $Request
+            $Request = New-Object Amazon.S3.Model.ListObjectsRequest
+            $Request.BucketName = $PSPath
+            $Request.MaxKeys = $MaximunKeys
+            $Request.Prefix = $Prefix
         }
-    }
-    Process {
         do {
-            [Amazon.S3.Model.ListObjectsResponse]$response = $AWSS3Client.ListObjects($listRequest)
-            if ($response.IsTruncated) {
-                write-host "Truncated response..." -ForegroundColor Red
-                $listRequest.Marker = $response.NextMarker;
+            [Amazon.S3.Model.ListObjectsResponse]$response = $AWSS3Client.ListObjects($Request)
+            if ($Response.IsTruncated) {
+                Write-Debug "Truncated response..."
+                $Request.Marker = $Response.NextMarker;
             } else {
-                $listRequest = $null
+                $Request = $null
             }
-            if ($response.S3Objects.Count -gt 0) {
-                $response.S3Objects | ForEach-Object {
+            if ($Response.S3Objects.Count -gt 0) {
+                $Response.S3Objects | ForEach-Object {
                     [Amazon.S3.Model.S3Object]$_
                     $c++
                     if ($c -gt $Count) { break }
                 }
             }
-        } while ($listRequest)
+        } while ($Request)
     }
-    End{
+    End {
+        $Request = $null
+        $Response = $null
         # return $response
     }
 }
@@ -395,7 +403,7 @@ Function Copy-S3Bucket {
     }
     return $S3CopyResponse
 }
-Function Rename-Bucket {
+Function Rename-S3Bucket {
     Param(
         [Parameter(Mandatory=$true)][Alias('Path')][string]$OriginalS3BucketName,
         [Parameter(Mandatory=$true)][Alias('NewName')][string]$NewS3BucketName,
@@ -403,11 +411,11 @@ Function Rename-Bucket {
     )
     try {
         if (!(Exist-S3Bucket $OriginalS3BucketName)) {
-            Write-host 'Origina bucket name' $OriginalS3BucketName 'does NOT exist' -ForegroundColor Red
+            Write-host 'Origina bucket name' $OriginalS3BucketName 'does NOT exist' -ForegroundColor Red -BackgroundColor Black
             break
         }
         if (Exist-S3Bucket $NewS3BucketName) {
-            Write-host 'New bucket name' $NewS3BucketName 'already exists' -ForegroundColor Red
+            Write-host 'New bucket name' $NewS3BucketName 'already exists' -ForegroundColor Red -BackgroundColor Black
             break
         }
         $newBucketResponse = New-Bucket -name $NewS3BucketName
@@ -466,7 +474,7 @@ Function s3UploadProgress {
     End {
     }
 }
-Function Test-AWSS3 {
+Function Test-S3 {
     $ok = $true
     try {
         $ipaddress = [System.Net.Dns]::GetHostAddresses("s3.amazon.com")
@@ -488,7 +496,7 @@ Function Test-AWSS3 {
     }
     return $ok
 }
-Function Copy-S3 {
+Function Publish-S3 {
     Param(
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
             [Object]$PSPath,
@@ -497,14 +505,36 @@ Function Copy-S3 {
         [Parameter(Mandatory=$true)][Alias('b')][string]$bucket,
         [Parameter(Mandatory=$false)][Alias('r')][switch]$recurse,
         [Parameter(Mandatory=$false)][Alias('flat')][switch]$flatnaming,
-        [Parameter(Mandatory=$false)][switch]$whatif
+        [Parameter(Mandatory=$false)][switch]$whatif,
+        [Parameter(Mandatory=$false)][switch]$force,
+        [Parameter(Mandatory=$false)][switch]$recursion
     )
     Begin {
         $flat = $flatnaming.IsPresent
-        if ($whatif.IsPresent) {
-            $whatIfList = @()
-        } else {
-            $s3Transfer = New-Object Amazon.S3.Transfer.TransferUtility($s3Client, $transConfig)
+        if (!$recursion.IsPresent) {
+            if ($whatif.IsPresent) {
+                $whatIfList = @()
+            } else {
+                if ($AWSS2TransferUtility -eq $null) {
+                    $s3Transfer = New-Object Amazon.S3.Transfer.TransferUtility($s3Client, $transConfig)
+                    new-variable -scope global -name AWSS2TransferUtility -force -value $s3Transfer
+                }    
+            }
+            if (!(Exist-S3Bucket $bucket)) {
+                if ($whatif.IsPresent) {
+                    Write-host 'Bucket name' $bucket 'does not exist' -ForegroundColor Red -BackgroundColor Black
+                }
+                if (!$whatif.IsPresent) {
+                    if ($force.IsPresent) {
+                        Write-Debug "Creating S3 Bucket"
+                        New-S3Bucket $bucket
+                    } else {
+                        break
+                    }
+                } elseif ( $whatif.IsPresent -and $force.IsPresent ) {
+                    Write-host 'Bucket name' $bucket 'will be created' -ForegroundColor Green -BackgroundColor Black
+                }
+            }
         }
     }
     Process {
@@ -513,10 +543,11 @@ Function Copy-S3 {
                 return
             }
             if ($whatif.IsPresent) {
-                write-host "Recursing into : " $_ -ForegroundColor Red
-                ls $_.PSPath | awsS3Transfer -bucket $bucket -whatif
+                $tmp = "Recursing into : " + $_ 
+                Write-Debug -Message $tmp
+                ls $_.PSPath | Publish-S3 -bucket $bucket -s3Client $s3Client -recursion -whatif
             } else {
-                ls $_.PSPath | awsS3Transfer -bucket $bucket
+                ls $_.PSPath | Publish-S3 -bucket $bucket -s3Client $s3Client -recursion
             }
         } else {
             if ($flat) {
@@ -533,7 +564,7 @@ Function Copy-S3 {
             } else {
                 $stateItem = New-Object PSOBject
                 $stateItem | add-member -membertype noteproperty -name key -value $fooName
-                $AWSS3UploadQueue += $s3Transfer.BeginUpload($_.FullName, $bucket, $fooName, (genericScriptBlockCallback { . s3UploadCallBack $awsUploadQueue }), $stateItem)
+                $AWSS3UploadQueue += $AWSS2TransferUtility.BeginUpload($_.FullName, $bucket, $fooName, (genericScriptBlockCallback { . s3UploadCallBack $awsUploadQueue }), $stateItem)
             }
         }
     }
@@ -550,10 +581,124 @@ Function Copy-S3 {
             }
             return $whatIfList
         } else {
+            new-variable -scope global -name AWSS3UploadQueue -value $AWSS3UploadQueue -force
             return $AWSS3UploadQueue
         }
     }
 }
-ADD-aws | Out-Null
+Function Set-EC2Config {
+    Param(
+        [Parameter(Mandatory=$false)][string]$proxyID,
+        [Parameter(Mandatory=$false)][string]$proxyPwd,
+        [Parameter(Mandatory=$false)][string]$proxyHost,
+        [Parameter(Mandatory=$false)][string]$proxyPort,
+        [Parameter(Mandatory=$false)][switch]$http
+    )
+    $ec2Config = New-object Amazon.EC2.AmazonEC2Config
+    if ($http.isPresent) {
+        $ec2Config.CommunicationProtocol = "HTTP"
+    }
+    if ($proxyHost) {$ec2Config.ProxyHost = $proxyHost}
+    if ($proxyPort) {$ec2Config.ProxyPort = $proxyPort}
+    if ($proxyUserID) {$ec2Config.ProxyUserName = $proxyUserID}
+    if ($proxyPwd) {$ec2Config.ProxyPassword = $proxyPwd}
+    new-variable -scope global -name AWSEC2Config -force
+    $AWSEC2Config = $ec2Config
+    return $AWSEC2Config
+}
+Function Get-EC2Config {
+    if (!$AWSEC2Config) {
+        . Set-EC2Config
+    }
+    return $AWSEC2Config
+}
+Function Get-EC2Client {
+    Param(
+        [Parameter(Mandatory=$false)][Alias('creds')][Amazon.Runtime.BasicAWSCredentials]$AWSBasicCredentials = (. Get-AWSBasicCredentials),
+        [Parameter(Mandatory=$false)][Alias('config')][Amazon.EC2.AmazonEC2Config]$AWSEC2Config = (. Get-EC2Config)
+    )
+    if ($AWSEc2InstancesRequest) {
+        $AWSEc2InstancesRequest.Dispose()
+        $AWSEc2InstancesRequest = $null
+    }
+    new-variable -scope global -name AWSEC2Client -force -value ([Amazon.AWSClientFactory]::CreateAmazonEC2Client($AWSBasicCredentials.GetCredentials().AccessKey, $AWSBasicCredentials.GetCredentials().ClearSecretKey, $AWSEC2Config))
+    return $AWSEC2Client
+}
+Function Set-EC2Request {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('ami')][string]$ImageId,
+        [Parameter(Mandatory=$false)][Alias('type')][string]$InstanceType = 't1.micro',
+        [Parameter(Mandatory=$false)][Alias('key')][string]$KeyName,
+        [Parameter(Mandatory=$false)][Alias('sg')][string]$SecurityGroup,
+        [Parameter(Mandatory=$false)][Alias('count')][int]$StartCount = 0,
+        [Parameter(Mandatory=$false)][Alias('min')][int]$MinCount = 1,
+        [Parameter(Mandatory=$false)][Alias('max')][int]$MaxCount = 1,
+        [Parameter(Mandatory=$false)][Alias('behavior')][string]$InstanceInitiatedShutdownBehavior,
+        [Parameter(Mandatory=$false)][Alias('monitor')][bool]$Monitoring = $false,
+        [Parameter(Mandatory=$false)][Alias('terminable')][bool]$DisableApiTermination = $false,
+        [Parameter(Mandatory=$false)][Alias('ec2client')][Amazon.EC2.AmazonEC2Client]$AWSEC2Client = (. Get-EC2Client)
+    )
+    $Request = New-Object Amazon.EC2.Model.RunInstancesRequest
+    $Request.ImageId = $ImageId
+    $Request.InstanceType = $InstanceType
+    if ($KeyName) { $Request.KeyName = $KeyName }
+    if ($SecurityGroup) { $Request.SecurityGroup = $SecurityGroup }
+    if ($StartCount -gt 0) {
+        $Request.MinCount = $StartCount
+        $Request.MaxCount = $StartCount
+    } else {
+        $Request.MinCount = $MinCount
+        $Request.MaxCount = $MaxCount
+    }
+    if ($InstanceInitiatedShutdownBehavior) { $Request.InstanceInitiatedShutdownBehavior = $InstanceInitiatedShutdownBehavior }
+    $Monitor = New-Object Amazon.EC2.Model.MonitoringSpecification
+    $Request.Monitoring = $Monitor
+    $Request.Monitoring.Enabled = $Monitoring
+    $Request.DisableApiTermination = $DisableApiTermination
+    new-variable -scope global -name AWSEc2InstancesRequest -force
+    $AWSEc2InstancesRequest = $Request
+    return $Request
+}
+Function Get-EC2Request {
+    if (!$AWSEc2InstancesRequest) {
+        . Set-EC2RequestGetPasswordDataResult
+    }
+    return $AWSEc2InstancesRequest
+}
+Function Get-EC2Password {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('request')][Alias('id')][string]$InstanceId,
+        [Parameter(Mandatory=$false)][Alias('client')][Alias('c')][Amazon.EC2.AmazonEC2Client]$EC2Client = (. Get-EC2Client)
+    )
+    $hmacsha = New-Object System.Security.Cryptography.HMACSHA1
+    $Request = New-Object Amazon.EC2.Model.GetPasswordDataRequest
+    $Request.InstanceId = $InstanceId
+    $Response = $EC2Client.GetPasswordData($Request)
+    return $Response.GetPasswordDataResult.PasswordData.Data
+}
+Function Start-EC2 {
+    Param (
+        [Parameter(Mandatory=$false)][Alias('request')][Alias('r')][Amazon.EC2.Model.RunInstancesRequest]$EC2Request = (. Get-EC2Request),
+        [Parameter(Mandatory=$false)][Alias('client')][Alias('c')][Amazon.EC2.AmazonEC2Client]$EC2Client = (. Get-EC2Client)
+    )
+    return $EC2Client.RunInstances($EC2Request)
+}
+Function Connect-EC2RDP($server, $user, $pass) {
+    cmdkey /generic:TERMSRV/$server /user:$user /pass:$pass
+    mstsc /v:$server
+}
+Function Connect-EC2PSRemote {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('s')][string]$Server,
+        [Parameter(Mandatory=$false)][Alias('usr')][string]$UserName,
+        [Parameter(Mandatory=$false)][Alias('pwd')][string]$Password
+    )
+    $secure = ConvertTo-SecureString $pass -asplaintext -force
+    $cred = New-Object System.Management.Automation.PSCredential $user,$secure
+    Set-Variable -Name UserCredential -Value $cred -Scope global
+    New-PSSession -computername $server -credential $UserCredential -UseSSL
+}
+
+Add-AWSSDK | Out-Null
 new-variable -scope global -name AWSS3UploadQueue -value @() -force
 new-variable -scope global -name AWSS3MultiPartStartSize -value 1MB -force
