@@ -8,7 +8,9 @@ Start background process
 .DESCRIPTION
 This scripts provides a wrapper to System.Diagnostics.Process
 .EXAMPLE
-
+$ffprobe = "ffprobe.exe"
+$probeCMDLine = ' -prefix -show_streams -i "' + $file.FullName + '"'
+$stdOut = Do-StartProcess.ps1 $ffprobe $probeCMDLine
 .LINK
 http://sushihangover.blogspot.com
 #>
@@ -74,12 +76,20 @@ function startProcess {
     	$ProcessInfo.FileName = $cliCmd
 	    $ProcessInfo.Arguments = $cmdArgs
 	    $ProcessInfo.UseShellExecute = $False
+        $ProcessInfo.RedirectStandardInput = $false
+        $ProcessInfo.RedirectStandardOutput = $true
 	    $newProcess = [System.Diagnostics.Process]::Start($ProcessInfo)
         $newProcess.PriorityClass = $cmdPriority
         if ($waitForExit) {
             $newProcess.WaitForExit()
+            $stdOut = @()
+            do {
+                $readLine = $newProcess.StandardOutput.ReadLine()
+                $stdOut += $readLine
+            } while ($readLine -ne $null)
+
         }
+        return $stdout
     }
 }
 startProcess $cliCmd $cmdArgs $waitForExit $cmdPriority
-exit
