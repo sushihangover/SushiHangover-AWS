@@ -24,12 +24,12 @@ $stdOut = Do-StartProcess.ps1 $ffprobe $probeCMDLine
 .LINK
 http://sushihangover.blogspot.com
 #>
-function startProcess {
+function Do-StartProcess {
     param(
-        [parameter(parametersetname="All",mandatory=$true,position=1)][Alias("cmd")][string]$cliCmd,
-        [parameter(parametersetname="All",mandatory=$false,position=2)][Alias("args")][string]$cmdArgs="",
-        [parameter(parametersetname="All",mandatory=$false,position=3)][Alias("wait")][boolean]$waitForExit = $true,
-        [parameter(parametersetname="All",mandatory=$false,position=4)][Alias("priority")]
+        [parameter(mandatory=$true,position=1)][Alias("cmd")][string]$cliCmd,
+        [parameter(mandatory=$false,position=2)][Alias("args")][string]$cmdArgs="",
+        [parameter(mandatory=$false,position=3)][Alias("wait")][boolean]$waitForExit = $true,
+        [parameter(mandatory=$false,position=4)][Alias("priority")]
             [string]$cmdPriority=[System.Diagnostics.ProcessPriorityClass]::Idle
     )
     $ProcessInfo = New-Object System.Diagnostics.ProcessStartInfo
