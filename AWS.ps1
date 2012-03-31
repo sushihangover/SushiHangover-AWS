@@ -206,7 +206,6 @@ Function New-S3Bucket {
     }
     $s3BucketRequest.BucketName = $S3BucketName
     return $AWSS3Client.PutBucket($s3BucketRequest)
-
 #AmazonS3Exception
 #Exception calling "PutBucket" with "1" argument(s): "The requested bucket name is not
 #available. The bucket namespace is shared by all users of the system. Please select a
@@ -411,30 +410,34 @@ Function Rename-S3Bucket {
     )
     try {
         if (!(Exist-S3Bucket $OriginalS3BucketName)) {
-            Write-host 'Origina bucket name' $OriginalS3BucketName 'does NOT exist' -ForegroundColor Red -BackgroundColor Black
+            Write-host 'Original bucket name' $OriginalS3BucketName 'does NOT exist' -ForegroundColor Red -BackgroundColor Black
             break
         }
         if (Exist-S3Bucket $NewS3BucketName) {
             Write-host 'New bucket name' $NewS3BucketName 'already exists' -ForegroundColor Red -BackgroundColor Black
             break
         }
-        $newBucketResponse = New-Bucket -name $NewS3BucketName
-        Get-S3Bucket $OriginalS3BucketName | % {
-            $request = New-object Amazon.S3.Model.CopyObjectRequest
-            $request.SourceBucket = $_.BucketName
-            $request.SourceKey = $_.Key
-            $request.DestinationBucket = $NewS3BucketName
-            $request.DestinationKey = $_.Key
-            Copy-S3Object $request
+        $newBucketResponse = New-S3Bucket -name $NewS3BucketName
+        New-S3Bucket -name $NewS3BucketName
+        if (Exist-S3Bucket $NewS3BucketName) {
+            Get-S3Bucket $OriginalS3BucketName | % {
+                $request = New-object Amazon.S3.Model.CopyObjectRequest
+                $request.SourceBucket = $_.BucketName
+                $request.SourceKey = $_.Key
+                $request.DestinationBucket = $NewS3BucketName
+                $request.DestinationKey = $_.Key
+                Copy-S3Object $request
+            }
+            $deletebucket = Remove-S3Bucket -name $OriginalS3BucketName
+        } else {
+            $newBucketResponse
         }
-        $deletebucket = Remove-Bucket -name $OriginalS3BucketName
     } catch [Amazon.S3.AmazonS3Exception] {
-        [Amazon.S3.AmazonS3Exception]$error[0].Message
-        break
+        $error[0]
+        Write-Verbose $error[0].Exception
     } catch {
         $error[0]
     }
-
 #catch (AmazonS3Exception amazonS3Exception)
 #            {
 #                if (amazonS3Exception.ErrorCode != null &&
@@ -500,14 +503,14 @@ Function Publish-S3 {
     Param(
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
             [Object]$PSPath,
-        [Parameter(Mandatory=$false)][Amazon.S3.AmazonS3Client]$s3Client = (. Get-AWSS3Client),
-        [Parameter(Mandatory=$false)][Amazon.S3.Transfer.TransferUtilityConfig]$transConfig = (. Get-AWSS3TransferConfig),
-        [Parameter(Mandatory=$true)][Alias('b')][string]$bucket,
-        [Parameter(Mandatory=$false)][Alias('r')][switch]$recurse,
-        [Parameter(Mandatory=$false)][Alias('flat')][switch]$flatnaming,
-        [Parameter(Mandatory=$false)][switch]$whatif,
-        [Parameter(Mandatory=$false)][switch]$force,
-        [Parameter(Mandatory=$false)][switch]$recursion
+        [Parameter(Mandatory=$false)][Amazon.S3.AmazonS3Client]$S3Client = (. Get-AWSS3Client),
+        [Parameter(Mandatory=$false)][Amazon.S3.Transfer.TransferUtilityConfig]$TransConfig = (. Get-AWSS3TransferConfig),
+        [Parameter(Mandatory=$true)][Alias('b')][string]$Bucket,
+        [Parameter(Mandatory=$false)][Alias('r')][switch]$Recurse,
+        [Parameter(Mandatory=$false)][Alias('flat')][switch]$Flatnaming,
+        [Parameter(Mandatory=$false)][switch]$Whatif,
+        [Parameter(Mandatory=$false)][switch]$Force,
+        [Parameter(Mandatory=$false)][switch]$Recursion
     )
     Begin {
         $flat = $flatnaming.IsPresent
