@@ -42,10 +42,9 @@ Begin {
     switch ($PsCmdlet.ParameterSetName)
     {
         "Setup"  {
-            $file = $MyInvocation.MyCommand.Name
-            $google = New-Object PSOBject
-            $google | add-member -membertype noteproperty -name secretkey -value $saveSecertKey
-            $google | export-clixml -Path $HOME\aws_secretkey.xml
+            $s3 = New-Object PSOBject
+            $s3 | add-member -membertype noteproperty -name secretkey -value $saveSecertKey
+            $s3 | export-clixml -Path $HOME\aws_secretkey.xml
             exit
         }
         "Main"  {
