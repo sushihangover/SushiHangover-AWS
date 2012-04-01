@@ -70,24 +70,27 @@ Function Do-RawPipe {
         }
         write-host "$procName1 Std Output Length : " ((($foo) * $buffer.Length) + $readCount)
         
+        Write-Debug "Process2 StdIn close"
         $process2.StandardInput.Close()
-        $process2.WaitForExit()
+        Write-Debug "Process2 wait for exit"
+        #$process2.WaitForExit()
         if ($process2.HasExited) {
             write-debug $procName2 " Exit Code = " $processs2.ExitCode
-        } 
-
+        }
+        Write-Debug "Process1 StdOut close"
         $process1.StandardOutput.Close()
-        $process1.WaitForExit()
+        Write-Debug "Process1 wait for exit"
+        #$process1.WaitForExit()
         if ($process1.HasExited) {
             write-debug $procName1 " Exit Code = " $processs1.ExitCode
         }
     } catch {
        write-host "Catch Error and clean up"
-       $process2.StandardInput.Flush()
-       $process2.StandardInput.Close()
-       $process2.Close; $process2.Dispose()
-       $process1.StandardInput.Close()
-       $process1.Close; $process1.Dispose()
-       exit
+       # $process2.StandardInput.Flush()
+       #$process2.StandardInput.Close()
+       #$process2.Close; $process2.Dispose()
+       #$process1.StandardInput.Close()
+       #$process1.Close; $process1.Dispose()
+#       exit
     }
 } 
