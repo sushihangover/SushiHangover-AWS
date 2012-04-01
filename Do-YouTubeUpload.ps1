@@ -24,7 +24,7 @@ of the video uploaded
 .EXAMPLE
 » Do-YouTubeUpload.ps1 -videoname 'C:\videos\SpaceNeedle1080p.wmv'  -title 'Space Needle' -description 'Space Needle Bending Over' -category 'Places' -keywords 'Seattle' -private $true
 FYI: The Google SDK (GData API) is real fussy on the path, make it look like a DOS path, no funky Powershell stuff here...
-.EXAMPLE
+.EXAMPLE 
 Do-YouTubeUpload.ps1 -key 'AI39s....hwzHhw' -id 'yourgoogleid@gmail.com' -pwd 'yourpassword'
 Run the script once with your Developer's key, user name and password
 and it will be saved in a CLIXML file named youtube_authorization.xml 
@@ -50,6 +50,8 @@ Begin {
     switch ($PsCmdlet.ParameterSetName)
     {
         "Setup"  {
+            $file = $MyInvocation.MyCommand.Name
+            new-eventlog -computername Server01 -source YouTubeUpload -logname Application -MessageResourceFile $file -CategoryResourceFile $file
             $google = New-Object PSOBject
             $google | add-member -membertype noteproperty -name key -value $devkey
             $google | add-member -membertype noteproperty -name id -value $user
@@ -58,9 +60,13 @@ Begin {
             exit
         }
         "Main"  {
+#            if (![system.diagnostics.eventlog]::SourceExists("YouTubeUpload"))  { 
+#                [system.diagnostics.EventLog]::CreateEventSource("YouTubeUpload","Application") 
+#                exit
+#            }
             if (!(Test-Path $HOME\youtube_authorization.xml)) {
                 write-host 'Authorization file missing' -ForegroundColor Red
-                help Do-YouTubeUpload.ps1 -examples
+                help ($MyInvocation.MyCommand.Name) -examples
                 exit
             }
             $google = Import-Clixml $HOME\youtube_authorization.xml
@@ -122,13 +128,15 @@ Process {
 
     } catch [System.IO.DirectoryNotFoundException] {
         write-host "Video file directory not found..." -ForegroundColor Red
+        write-eventlog -logname Application -source 'YouTubeUpload' -eventID 1002 -entrytype Error -message 'Failure: Directory not found; ' + $videoName  -category 1
         break
     } catch [System.IO.FileNotFoundException] {
         write-host "Video file not found..." -ForegroundColor Red
+        write-eventlog -logname Application -source 'YouTubeUpload' -eventID 1003 -entrytype Error -message 'Failure: File not found; ' + $videoName  -category 1
         break
     } catch [Google.GData.Client.GDataRequestException] { 
         $err = $_.Exception
-        $err.ToString()
+        write-eventlog -logname Application -source 'YouTubeUpload' -eventID 1099 -entrytype Error -message 'GDataRequestException: ' + $err.ToString() -category 1
         break
     } finally {
         try {
@@ -136,6 +144,9 @@ Process {
         } catch [Google.GData.Client.GDataNotModifiedException] {
             $status = $uploadedVideo
         }
+    }
+    if ($status.Status -eq $null) {
+        write-eventlog -logname Application -source 'YouTubeUpload' -eventID 1001 -entrytype Information -message 'Success: ' + $status.WatchPage -category 1
     }
     return $status
 }
