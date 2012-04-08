@@ -59,4 +59,9 @@ Function Test-AWSCredentials {
         Connect-AWSS3
     }
 }
+Function Do-QuickList {
+    $args
+}
+New-Alias -Name QL -Value Do-QuickList
+
 . Add-AWSSDK | Out-Null
