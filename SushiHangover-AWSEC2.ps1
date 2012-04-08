@@ -1,4 +1,16 @@
-﻿Function Set-EC2Config {
+﻿<#
+    .NOTES
+    Copyright 2012 Robert Nees
+    Licensed under the Apache License, Version 2.0 (the "License");
+    http://sushihangover.blogspot.com
+    .SYNOPSIS
+    Amazon (AWS) EC2 PowerShell Interface
+    .DESCRIPTION
+    .EXAMPLE
+    .LINK
+    http://sushihangover.blogspot.com
+#>
+Function Set-EC2Config {
     Param(
         [Parameter(Mandatory=$false)][string]$proxyID,
         [Parameter(Mandatory=$false)][string]$proxyPwd,
@@ -123,7 +135,7 @@ Function Connect-EC2PSRemote {
 Function Get-EC2Instance {
     Param (
         [Parameter(Mandatory=$false)][Alias('i')][Alias('id')][string]$InstanceId,
-        [Parameter(Mandatory=$false)][Alias('f')][array]$Filter,
+        [Parameter(Mandatory=$false)][Alias('f')][Amazon.EC2.Model.Filter]$Filter,
         [Parameter(Mandatory=$false)][Alias('client')][Alias('c')][Amazon.EC2.AmazonEC2Client]$EC2Client = (. Get-EC2Client)
     )
     $Request = New-Object Amazon.EC2.Model.DescribeInstancesRequest
@@ -133,11 +145,11 @@ Function Get-EC2Instance {
     }
     $Request.Filter = $Filter
     [Amazon.EC2.Model.DescribeInstancesResponse]$Response = $EC2Client.DescribeInstances($Request)
-    #return $Response.DescribeInstancesResult.Reservation
+#    return $Response.DescribeInstancesResult.Reservation
     [array]$Instances = @()
     #$Instances += $Response.DescribeInstancesResult.Reservation | % { $_.RunningInstance }
     $Instances += $Response.DescribeInstancesResult.Reservation | % { $_.RunningInstance }
-    write-host $Instances.count
+#    write-host $Instances.count
     Return [array]$Instances
 }
 Function Get-EC2InstanceStatus {
@@ -154,6 +166,68 @@ Function Get-EC2InstanceStatus {
     $Request.Filter = $Filter
     return [Amazon.EC2.Model.DescribeInstanceStatusResponse]$EC2Client.DescribeInstanceStatus($Request)
 }
+Function Get-EC2Tag {
+    Param (
+        [Parameter(Mandatory=$true)][string]$Key,
+        [Parameter(Mandatory=$true)][string]$Value
+    )
+    $Tag = New-Object Amazon.EC2.Model.Tag
+    $Tag.Key = $Key
+    $Tag.Value = $Value
+    return $Tag
+# $f | ForEach-Object {$_.Tag | where-object Key -eq "Name" | get-member}
+}
+Function Get-EC2TagList {
+    Param (
+        [Parameter(Mandatory=$true)][Amazon.EC2.Model.Tag]$Tag,
+        [Parameter(Mandatory=$false)][System.Collections.Generic.List[Amazon.EC2.Model.Tag]]$TagList = (New-Object System.Collections.Generic.List[Amazon.EC2.Model.Tag])
+    )
+    if ($Tag) {
+        $Taglist.Add($Tag)
+    }
+    return [System.Collections.Generic.List[Amazon.EC2.Model.Tag]]$TagList
+}
+Function Get-EC2Filter {
+<#
+    .NOTES
+    .SYNOPSIS
+    Build a Amazon.EC2.Model.Filter from individual properties or from a tag list
+    .DESCRIPTION
+    .EXAMPLE
+    $filter = Get-EC2Filter -type tag -name name -values 'Sushi Testing','Sushi*'
+    .EXAMPLE
+    $Tag = Get-EC2Tag 'Name' 'Sushi*'
+    $TagList = Get-EC2TagList $Tag
+    $filter2 = Get-EC2Filter -Taglist $TagList
+    Get-EC2Instance -filter $filter2
+
+#>
+    [CmdletBinding(DefaultParametersetName="TagList")]
+    Param (
+        [Parameter(ParameterSetName='Property',Mandatory=$false)][Alias('Type')][string]$PropertyType = 'tag',
+        [Parameter(ParameterSetName='Property',Mandatory=$true)][Alias('Name')][string]$PropertyName,
+        [Parameter(ParameterSetName='Property',Mandatory=$true)][Alias('Values')][array]$PropertyValues,
+        [Parameter(ParameterSetName='TagList',Mandatory=$false)][System.Object[]]$TagList
+    )
+    $Filter = New-Object Amazon.EC2.Model.Filter
+    $Values = New-Object System.Collections.Generic.List[string]
+    switch ($PsCmdlet.ParameterSetName) {
+        "TagList" {
+            ForEach ($Tag in $TagList) { #this should create multiple filters of the tag name are different!!!!
+                $Filter.Name = 'tag:' + $Tag.Key
+                $Values.Add($Tag.Value)
+            }  
+        }
+        "Property" {
+            $Filter.Name = $PropertyType + ':' + $PropertyName
+            ForEach ($Value in $PropertyValues) {
+                $Values.Add($Value)
+            }
+        }
+    }
+    $Filter.Value = $Values
+    return $Filter
+}
 Function Start-EC2Instance {
     Param (
         [Parameter(Mandatory=$true)][Alias('i')][Alias('id')][string]$InstanceId,
@@ -166,3 +240,4 @@ Function Start-EC2Instance {
     }
     return [Amazon.EC2.Model.StartInstancesResponse]$EC2Client.StartInstances($Request)    
 }
+. Add-AWSSDK | Out-Null
