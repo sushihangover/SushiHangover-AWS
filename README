@@ -1,0 +1,34 @@
+PowerShell Scripts are from sushihangover.blogspot.com
+
+Amazon Web Sevices (AWS) Inteface via PowerShell 2.0/3.0
+
+This module covers the following areas of AWS:
+
+
+* Amazon CloudFront, a content delivery network (CDN) for distributing objects stored in S3 to so-called "edge locations" near the requester.
+
+* Amazon CloudWatch, provides monitoring for AWS cloud resources and applications, starting with EC2.
+* Amazon Elastic Block Store (EBS) provides persistent block-level storage volumes for EC2.
+
+* Amazon Elastic Compute Cloud (EC2) provides scalable virtual private servers using Xen.
+
+* Amazon Elastic MapReduce allows businesses, researchers, data analysts, and developers to easily and cheaply process vast amounts of data. It uses a hosted Hadoop framework running on the web-scale infrastructure of EC2 and Amazon S3.
+
+* Amazon ElastiCache provides in-memory caching for web applications.
+
+* Amazon Relational Database Service (RDS) provides a scalable database server with MySQL and Oracle support.
+
+* Amazon Route 53 provides a highly available and scalable Domain Name System (DNS) web service.
+
+* Amazon Simple Email Service (SES) provides bulk and transactional email sending.
+
+* Amazon Simple Storage Service (S3) provides Web Service based storage.
+
+* Amazon Simple Queue Service (SQS) provides a hosted message queue for web applications.
+
+* Amazon Simple Notification Service (SNS) provides a hosted multiprotocol "push" messaging for web applications.
+
+* Amazon SimpleDB, allows developers to run queries on structured data. It operates in concert with EC2 and S3 to provide "the core functionality of a database."[5]
+*Amazon Virtual Private Cloud (VPC) creates a logically isolated set of Amazon EC2 instances which can be connected to an existing network using a VPN connection.
+
+For more information, check out my PowerShell blog @ http://sushihangover.blogspot.com
