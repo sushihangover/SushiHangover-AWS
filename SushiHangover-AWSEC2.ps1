@@ -177,6 +177,34 @@ Function Get-EC2Tag {
     return $Tag
 # $f | ForEach-Object {$_.Tag | where-object Key -eq "Name" | get-member}
 }
+
+Function Add-EC2Tag {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('i')][Alias('id')][string]$ResourceId,
+        [Parameter(Mandatory=$true)][string]$Key,
+        [Parameter(Mandatory=$true)][string]$Value,
+        [Parameter(Mandatory=$false)][Alias('client')][Alias('c')][Amazon.EC2.AmazonEC2Client]$EC2Client = (. Get-EC2Client)
+    )
+    $Request = New-Object Amazon.EC2.Model.CreateTagsRequest
+    $Request.WithResourceId($ResourceId) | Out-Null
+    $Request.WithTag((. Get-EC2Tag $Key $Value)) | Out-Null
+    $Response = $null
+    $EC2Client.CreateTags($Request) | Out-Null
+}
+
+Function Add-EC2Tags {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('i')][Alias('id')][string]$ResourceId,
+        [Parameter(Mandatory=$false)]$Tags,
+        [Parameter(Mandatory=$false)][Alias('client')][Alias('c')][Amazon.EC2.AmazonEC2Client]$EC2Client = (. Get-EC2Client)
+    )
+    $Request = New-Object Amazon.EC2.Model.CreateTagsRequest
+    $Request.WithResourceId($ResourceId) | Out-Null
+    $Request.WithTag($tags) | Out-Null
+    $Response = $null
+    $EC2Client.CreateTags($Request) | Out-Null
+}
+
 Function Get-EC2TagList {
     Param (
         [Parameter(Mandatory=$true)][Amazon.EC2.Model.Tag]$Tag,
@@ -240,4 +268,69 @@ Function Start-EC2Instance {
     }
     return [Amazon.EC2.Model.StartInstancesResponse]$EC2Client.StartInstances($Request)    
 }
+
+Function Get-EBSVolume {
+    Param (
+        [Parameter(Mandatory=$false)][Alias('i')][Alias('id')][string]$VolumeId,
+        [Parameter(Mandatory=$false)][Alias('f')][Amazon.EC2.Model.Filter]$Filter,
+        [Parameter(Mandatory=$false)][Alias('client')][Alias('c')][Amazon.EC2.AmazonEC2Client]$EC2Client = (. Get-EC2Client)
+    )
+    $Request = New-Object Amazon.EC2.Model.DescribeVolumesRequest
+    if ($VolumeId) {
+        $Request.WithVolumeId($VolumeId) | Out-Null
+    }
+    if($Filter) {
+        $Request.WithFilter($Filter) | Out-Null
+    }
+    [Amazon.EC2.Model.DescribeVolumesResponse]$Response = $EC2Client.DescribeVolumes($Request)
+    #write-host $Response.DescribeVolumesResult
+    #write-host $Response.DescribeVolumesResult.Volume.Count
+    return [array]$Response.DescribeVolumesResult.Volume
+}
+
+Function Get-EBSSnapshot {
+    Param (
+        [Parameter(Mandatory=$false)][Alias('i')][Alias('id')][string]$SnapshotId,
+        [Parameter(Mandatory=$false)][Alias('o')][Alias('own')][string]$Owner = 'self',
+        [Parameter(Mandatory=$false)][Alias('f')][Amazon.EC2.Model.Filter]$Filter,
+        [Parameter(Mandatory=$false)][Alias('client')][Alias('c')][Amazon.EC2.AmazonEC2Client]$EC2Client = (. Get-EC2Client)
+    )
+    $Request = New-Object Amazon.EC2.Model.DescribeSnapshotsRequest
+    $Request.WithOwner($Owner) | Out-Null
+    if ($SnapshotId) {
+        $Request.WithSnapshotId($SnapshotId) | Out-Null
+    }
+    if($Filter) {
+        $Request.WithFilter($Filter) | Out-Null
+    }
+    [Amazon.EC2.Model.DescribeSnapshotsResponse]$Response = $EC2Client.DescribeSnapshots($Request)
+    return [array]$Response.DescribeSnapshotsResult.Snapshot
+}
+
+Function New-EBSSnapshot {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('i')][Alias('id')][string]$VolumeId,
+        [Parameter(Mandatory=$false)][Alias('d')][Alias('desc')][string]$Description,
+        [Parameter(Mandatory=$false)][Alias('client')][Alias('c')][Amazon.EC2.AmazonEC2Client]$EC2Client = (. Get-EC2Client)
+    )
+    $Request = New-Object Amazon.EC2.Model.CreateSnapshotRequest
+    $Request.WithVolumeId($VolumeId) | Out-Null
+    if ($Description) {
+        $Request.WithDescription($Description) | Out-Null
+    }
+    $Response = $null
+    [Amazon.EC2.Model.CreateSnapshotResponse]$Response = $EC2Client.CreateSnapshot($Request)
+    return $Response.CreateSnapshotResult.Snapshot
+}
+
+Function Remove-EBSSnapshot {
+    Param (
+        [Parameter(Mandatory=$true)][Alias('i')][Alias('id')][string]$SnapshotId,
+        [Parameter(Mandatory=$false)][Alias('client')][Alias('c')][Amazon.EC2.AmazonEC2Client]$EC2Client = (. Get-EC2Client)
+    )
+    $Request = New-Object Amazon.EC2.Model.DeleteSnapshotRequest
+    $Request.WithSnapshotId($SnapshotId) | Out-Null
+    [Amazon.EC2.Model.DeleteSnapshotResponse]$Response = $EC2Client.DeleteSnapshot($Request)
+}
+
 . Add-AWSSDK | Out-Null
